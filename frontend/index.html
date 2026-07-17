@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sherlock Agent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@400;600;700&family=Poppins:wght@400;500;600;700&family=Quicksand:wght@400;500;600;700&display=swap');
+
+      :root {
+        --bg: #0D111A;
+        --text: #F9F9F9;
+        --accent: #E42278;
+        --accent-soft: #ED7BAB;
+        --accent-light: #F5D3DD;
+        --surface: rgba(245, 211, 221, 0.08);
+        --border: rgba(228, 34, 120, 0.18);
+      }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        background: linear-gradient(180deg, #0D111A 0%, #07090F 100%);
+        color: var(--text);
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+
+      .glass-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        box-shadow: 0 24px 80px rgba(13, 17, 26, 0.45);
+        backdrop-filter: blur(24px);
+      }
+
+      .glass-button {
+        background: var(--accent);
+        color: var(--text);
+        transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+      }
+
+      .glass-button:hover {
+        background: #ED7BAB;
+        transform: translateY(-1px);
+      }
+
+      .glass-button:disabled {
+        background: rgba(228, 34, 120, 0.48);
+      }
+
+      .glass-input {
+        background: rgba(245, 211, 221, 0.08);
+        border: 1px solid rgba(228, 34, 120, 0.15);
+        color: var(--text);
+      }
+
+      .glass-accent {
+        color: var(--accent-soft);
+      }
+
+      .font-select {
+        min-width: 180px;
+        background: rgba(245, 211, 221, 0.08);
+        border: 1px solid rgba(228, 34, 120, 0.15);
+        color: var(--text);
+      }
+
+      .font-menu {
+        position: absolute;
+        right: 0;
+        margin-top: 0.5rem;
+        background: rgba(13, 17, 26, 0.94);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 1rem;
+        box-shadow: 0 24px 50px rgba(13, 17, 26, 0.45);
+        padding: 0.75rem 0;
+        z-index: 20;
+      }
+
+      .font-menu button {
+        width: 100%;
+        text-align: left;
+        padding: 0.75rem 1rem;
+      }
+
+      .font-menu button:hover {
+        background: rgba(228, 34, 120, 0.12);
+      }
+
+      .animate-fade-in-up { animation: fadeInUp 0.5s ease-out forwards; }
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .terminal-report {
+        background: rgba(5, 12, 24, 0.95);
+        border: 1px solid rgba(245, 211, 221, 0.16);
+        border-radius: 2rem;
+        padding: 1.75rem;
+      }
+      .terminal-report h4,
+      .terminal-report p,
+      .terminal-report ul {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+      }
+      .terminal-report h4 {
+        color: #ED7BAB;
+        letter-spacing: 0.03em;
+      }
+      .terminal-report p {
+        white-space: pre-wrap;
+      }
+      .terminal-report li {
+        margin-top: 0.35rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import React from 'https://esm.sh/react@18';
+      import ReactDOM from 'https://esm.sh/react-dom@18/client';
+
+      function App() {
+        const [isLoggedIn, setIsLoggedIn] = React.useState(false);
+        const [isChecking, setIsChecking] = React.useState(false);
+        const [newsInput, setNewsInput] = React.useState('');
+        const [results, setResults] = React.useState(null);
+        const [email, setEmail] = React.useState('');
+        const [phone, setPhone] = React.useState('');
+        const [name, setName] = React.useState('');
+        const [fontFamily, setFontFamily] = React.useState('Inter');
+        const [showFontMenu, setShowFontMenu] = React.useState(false);
+
+        const fontOptions = [
+          { value: 'Inter', label: 'Inter' },
+          { value: 'Poppins', label: 'Poppins' },
+          { value: 'Quicksand', label: 'Quicksand' },
+          { value: 'Nunito', label: 'Nunito' },
+        ];
+
+        const fontStyle = { fontFamily: `${fontFamily}, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif` };
+
+        const renderReportContent = (content) => {
+          if (!content) return null;
+
+          const lines = content
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean);
+
+          const elements = [];
+          let listItems = [];
+
+          const flushList = () => {
+            if (!listItems.length) return;
+            elements.push(
+              <ul key={`list-${elements.length}`} className="list-disc ml-8 space-y-2 mt-3 text-sm opacity-90">
+                {listItems.map((item, index) => (
+                  <li key={index}>{item}</li>
+                ))}
+              </ul>
+            );
+            listItems = [];
+          };
+
+          const pushParagraph = (text) => {
+            elements.push(
+              <p key={`para-${elements.length}`} className="mt-3 text-sm leading-relaxed opacity-90">
+                {text}
+              </p>
+            );
+          };
+
+          const pushHeading = (text) => {
+            elements.push(
+              <h4 key={`heading-${elements.length}`} className="mt-6 text-lg font-semibold text-[#ED7BAB]">
+                {text}
+              </h4>
+            );
+          };
+
+          lines.forEach((line) => {
+            if (/^#{1,3}\s+/.test(line)) {
+              flushList();
+              pushHeading(line.replace(/^#{1,3}\s+/, ''));
+            } else if (/^(-|\*|•)\s+/.test(line)) {
+              listItems.push(line.replace(/^(-|\*|•)\s+/, ''));
+            } else if (/^(Given Query|Confidence Score|Summary of the Query|Key Findings|Evidence with Timeline|Final Conclusion|References)[:]?/i.test(line)) {
+              flushList();
+              pushHeading(line.replace(/[:]?$/, ''));
+            } else if (/^\d+\.\s+/.test(line)) {
+              flushList();
+              listItems.push(line.replace(/^\d+\.\s+/, ''));
+            } else if (/^\w[\w\s]+:\s*/.test(line)) {
+              flushList();
+              const [label, ...rest] = line.split(':');
+              elements.push(
+                <p key={`label-${elements.length}`} className="mt-3 text-sm leading-relaxed opacity-90">
+                  <span className="font-semibold text-[#F5D3DD]">{label}:</span> {rest.join(':').trim()}
+                </p>
+              );
+            } else {
+              flushList();
+              pushParagraph(line);
+            }
+          });
+
+          flushList();
+          return elements;
+        };
+
+        const handleVerifyCredibility = async () => {
+          if (!newsInput.trim()) return;
+          setIsChecking(true);
+          setResults(null);
+
+          try {
+            const response = await fetch('http://127.0.0.1:5001/api/verify-credibility', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ topic: newsInput.trim() })
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+              throw new Error(data.error || 'Request failed');
+            }
+
+            setResults(data);
+          } catch (error) {
+            console.error(error);
+            setResults({
+              verdict: 'Investigation Failed',
+              confidence: 'API or Network Error',
+              summary: error.message,
+              sources: []
+            });
+          } finally {
+            setIsChecking(false);
+          }
+        };
+
+        const handleLogin = (event) => {
+          event.preventDefault();
+          if (email && phone && name) {
+            setIsLoggedIn(true);
+          } else {
+            alert('Please fill in all fields to continue.');
+          }
+        };
+
+        if (!isLoggedIn) {
+          return (
+            <div className="min-h-screen bg-[#0D111A] text-[#F9F9F9] flex flex-col items-center justify-center p-4" style={fontStyle}>
+              <div className="max-w-md w-full glass-card rounded-[32px] p-8">
+                <div className="flex flex-col items-center mb-8">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4 text-[#ED7BAB]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 14c-4.418 0-8 1.343-8 3v2h16v-2c0-1.657-3.582-3-8-3z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 14V6a4 4 0 00-8 0v2" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 8v-2a4 4 0 00-8 0" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 14h16" />
+                  </svg>
+                  <h1 className="text-4xl font-bold tracking-wider text-center glass-accent">SHERLOCK AGENT</h1>
+                  <p className="text-sm mt-2 opacity-70 text-center">Identify truth in a sea of noise</p>
+                </div>
+
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div>
+                    <label className="block text-sm mb-1 opacity-70">Full Name</label>
+                    <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full glass-input rounded-2xl p-3 text-[#F9F9F9] placeholder:text-[#F5D3DD] focus:outline-none focus:ring-2 focus:ring-[#ED7BAB]/30" placeholder="John Doe" />
+                  </div>
+                  <div>
+                    <label className="block text-sm mb-1 opacity-70">Email Address</label>
+                    <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full glass-input rounded-2xl p-3 text-[#F9F9F9] placeholder:text-[#F5D3DD] focus:outline-none focus:ring-2 focus:ring-[#ED7BAB]/30" placeholder="john@example.com" />
+                  </div>
+                  <div>
+                    <label className="block text-sm mb-1 opacity-70">Phone Number</label>
+                    <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full glass-input rounded-2xl p-3 text-[#F9F9F9] placeholder:text-[#F5D3DD] focus:outline-none focus:ring-2 focus:ring-[#ED7BAB]/30" placeholder="+1 (555) 000-0000" />
+                  </div>
+                  <button type="submit" className="w-full glass-button font-bold text-lg rounded-2xl p-3 mt-6 hover:shadow-xl">Enter Portal</button>
+                </form>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div className="min-h-screen bg-[#0D111A] text-[#F9F9F9]" style={fontStyle}>
+            <nav className="border-b border-[#F5D3DD]/10 p-4 sticky top-0 bg-[#0D111A]/90 backdrop-blur z-10">
+              <div className="max-w-6xl mx-auto flex items-center justify-between">
+                <div className="flex items-center space-x-3 cursor-pointer" onClick={() => { setResults(null); setNewsInput(''); }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-[#E42278]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14c-4.418 0-8 1.343-8 3v2h16v-2c0-1.657-3.582-3-8-3z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14V6a4 4 0 00-8 0v2" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 8v-2a4 4 0 00-8 0" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h16" />
+                  </svg>
+                  <span className="text-xl font-bold tracking-widest glass-accent">SHERLOCK AGENT</span>
+                </div>
+                <div className="flex items-center gap-3 relative">
+                  <div className="text-sm opacity-80">
+                    Welcome, {name.split(' ')[0]}
+                    <button onClick={() => setIsLoggedIn(false)} className="ml-4 text-xs border border-[#F5D3DD]/30 px-2 py-1 rounded hover:bg-[#F5D3DD]/10 transition-colors">Log Out</button>
+                  </div>
+                  <div className="relative">
+                    <button onClick={() => setShowFontMenu(!showFontMenu)} className="flex items-center gap-2 rounded-full border border-[#F5D3DD]/20 bg-[#0D111A]/90 px-4 py-2 text-sm font-medium text-[#F9F9F9] transition hover:bg-[#F5D3DD]/10">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-[#E42278]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v2m0 8v2m6-6h-2M8 12H6m12.364-4.364l-1.414 1.414M8.05 15.95l-1.414 1.414M16.95 15.95l1.414 1.414M8.05 8.05L6.636 6.636" />
+                      </svg>
+                      <span>Font: {fontFamily}</span>
+                    </button>
+                    {showFontMenu && (
+                      <div className="font-menu">
+                        <div className="px-4 pb-2 text-xs uppercase tracking-[0.15em] text-[#F5D3DD]">Choose font style</div>
+                        {fontOptions.map((font) => (
+                          <button key={font.value} onClick={() => { setFontFamily(font.value); setShowFontMenu(false); }} className="font-menu-item text-sm text-[#F9F9F9] hover:text-[#E42278]">
+                            <div className="font-semibold">{font.label}</div>
+                            <div className="text-[11px] opacity-70">
+                              {font.value === 'Inter' && 'Crisp, modern tech UI.'}
+                              {font.value === 'Poppins' && 'Geometric and cheerful.'}
+                              {font.value === 'Quicksand' && 'Soft rounded and inviting.'}
+                              {font.value === 'Nunito' && 'Playful, clean, and legible.'}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </nav>
+
+            <main className="max-w-4xl mx-auto p-4 py-8">
+              <section className="mb-12 glass-card p-6 rounded-[32px]">
+                <h2 className="text-2xl font-bold mb-4">How it works</h2>
+                <p className="leading-relaxed opacity-80 text-lg">Paste a claim or article below. The backend searches the web and returns a structured credibility report with supporting sources.</p>
+              </section>
+
+              <section className="mb-12">
+                <h2 className="text-3xl font-bold mb-6 text-center glass-accent">News Credibility Validator</h2>
+                <div className="glass-card rounded-[32px] p-6 border-[#F5D3DD]/10">
+                  <textarea className="w-full glass-input rounded-[24px] p-4 text-[#F9F9F9] placeholder:text-[#F5D3DD] focus:outline-none focus:ring-2 focus:ring-[#ED7BAB]/30 min-h-[150px] resize-y" placeholder="Paste the news text or claim you want to investigate here..." value={newsInput} onChange={(e) => setNewsInput(e.target.value)} />
+
+                  <div className="flex flex-col sm:flex-row items-center justify-between mt-4 gap-4">
+                    <button onClick={handleVerifyCredibility} disabled={isChecking || !newsInput.trim()} className="w-full sm:w-auto glass-button font-bold text-lg rounded-[24px] px-8 py-3 disabled:opacity-50 disabled:cursor-not-allowed">
+                      {isChecking ? 'Investigating...' : 'Verify Credibility'}
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              {results && (
+                <div className="animate-fade-in-up">
+                  <h3 className="text-2xl font-bold mb-6 border-b border-white/10 pb-2">Investigation Findings</h3>
+                  <div className="glass-card p-6 rounded-[32px] mb-8 border-[#F5D3DD]/10">
+                    <div className="terminal-report text-base leading-relaxed opacity-90">
+                      <h4 className="text-lg font-semibold text-[#ED7BAB]">Given Query</h4>
+                      <p className="mt-3 text-sm leading-relaxed opacity-90">{results.given_query || results.topic}</p>
+
+                      <h4 className="text-lg font-semibold text-[#ED7BAB] mt-6">Confidence Score</h4>
+                      <p className="mt-3 text-sm leading-relaxed opacity-90">{results.confidence_score || results.confidence}</p>
+
+                      <h4 className="text-lg font-semibold text-[#ED7BAB] mt-6">Key Findings</h4>
+                      <ul className="list-disc ml-6 space-y-2 mt-3 text-sm opacity-90">
+                        {(results.key_findings || []).map((finding, index) => (
+                          <li key={index}>{finding}</li>
+                        ))}
+                      </ul>
+
+                      <h4 className="text-lg font-semibold text-[#ED7BAB] mt-6">Final Conclusion</h4>
+                      <p className="mt-3 text-sm leading-relaxed opacity-90">{results.final_conclusion || results.summary}</p>
+
+                      <h4 className="text-lg font-semibold text-[#ED7BAB] mt-6">References</h4>
+                      <ul className="list-disc ml-6 space-y-2 mt-3 text-sm opacity-90">
+                        {(results.references || []).map((reference, index) => (
+                          <li key={index}>{reference}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </main>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sherlock Agent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body { background: #000; color: #ffb6c1; font-family: Arial, sans-serif; }
+      .animate-fade-in-up { animation: fadeInUp 0.5s ease-out forwards; }
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="text/babel">
+      const { useState } = React;
+
+      function App() {
+        const [isLoggedIn, setIsLoggedIn] = useState(false);
+        const [isChecking, setIsChecking] = useState(false);
+        const [newsInput, setNewsInput] = useState('');
+        const [results, setResults] = useState(null);
+        const [email, setEmail] = useState('');
+        const [phone, setPhone] = useState('');
+        const [name, setName] = useState('');
+
+        const getVerdictColors = (verdict) => {
+          if (verdict === 'Highly Credible') {
+            return {
+              container: 'bg-green-900/20 border-green-500/50',
+              label: 'text-green-400',
+              badge: 'bg-green-950/70 text-green-200',
+            };
+          }
+          if (verdict === 'False') {
+            return {
+              container: 'bg-red-900/20 border-red-500/50',
+              label: 'text-red-400',
+              badge: 'bg-red-950/70 text-red-200',
+            };
+          }
+          if (verdict === 'Questionable') {
+            return {
+              container: 'bg-[#2e0f1d]/20 border-[#ffb6c1]/40',
+              label: 'text-[#FFB6C1]',
+              badge: 'bg-[#3f1227]/70 text-[#FFB6C1]',
+            };
+          }
+          return {
+            container: 'bg-slate-900/30 border-slate-500/20',
+            label: 'text-slate-200',
+            badge: 'bg-slate-950/70 text-slate-200',
+          };
+        };
+
+        const formatReportText = (text) => {
+          if (!text) return null;
+
+          const lines = text
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean);
+
+          const elements = [];
+          let currentList = [];
+
+          const flushList = () => {
+            if (!currentList.length) return;
+            elements.push(
+              <ul key={`list-${elements.length}`} className="list-disc ml-6 space-y-1 text-sm opacity-90">
+                {currentList.map((item, index) => (
+                  <li key={index}>{item}</li>
+                ))}
+              </ul>
+            );
+            currentList = [];
+          };
+
+          lines.forEach((line) => {
+            if (/^#{1,3}\s+/.test(line)) {
+              flushList();
+              elements.push(
+                <h4 key={`heading-${elements.length}`} className="text-lg font-semibold mt-4 mb-2">
+                  {line.replace(/^#{1,3}\s+/, '')}
+                </h4>
+              );
+            } else if (/^(\*|-|•)\s+/.test(line)) {
+              currentList.push(line.replace(/^(\*|-|•)\s+/, ''));
+            } else {
+              flushList();
+              elements.push(
+                <p key={`para-${elements.length}`} className="text-base leading-relaxed mt-2 opacity-90">
+                  {line}
+                </p>
+              );
+            }
+          });
+
+          flushList();
+          return elements;
+        };
+
+        const handleVerifyCredibility = async () => {
+          if (!newsInput.trim()) return;
+          setIsChecking(true);
+          setResults(null);
+
+          try {
+            const response = await fetch('http://127.0.0.1:5001/api/verify-credibility', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ topic: newsInput.trim() })
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+              throw new Error(data.error || 'Request failed');
+            }
+
+            setResults(data);
+          } catch (error) {
+            console.error(error);
+            setResults({
+              verdict: 'Investigation Failed',
+              confidence: 'API or Network Error',
+              summary: error.message,
+              sources: []
+            });
+          } finally {
+            setIsChecking(false);
+          }
+        };
+
+        const handleLogin = (event) => {
+          event.preventDefault();
+          if (email && phone && name) {
+            setIsLoggedIn(true);
+          } else {
+            alert('Please fill in all fields to continue.');
+          }
+        };
+
+        if (!isLoggedIn) {
+          return (
+            <div className="min-h-screen bg-black text-[#FFB6C1] flex flex-col items-center justify-center p-4 font-sans">
+              <div className="max-w-md w-full bg-gray-900 rounded-xl shadow-2xl p-8 border border-[#FFB6C1]/20">
+                <div className="flex flex-col items-center mb-8">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4 text-[#FFB6C1]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 14c-4.418 0-8 1.343-8 3v2h16v-2c0-1.657-3.582-3-8-3z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 14V6a4 4 0 00-8 0v2" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 8v-2a4 4 0 00-8 0" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 14h16" />
+                  </svg>
+                  <h1 className="text-4xl font-bold tracking-wider text-center">SHERLOCK AGENT</h1>
+                  <p className="text-sm mt-2 opacity-80 text-center">Identify truth in a sea of noise</p>
+                </div>
+
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div>
+                    <label className="block text-sm mb-1 opacity-80">Full Name</label>
+                    <input type="text" required value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-black border border-[#FFB6C1]/40 rounded-lg p-3 text-[#FFB6C1] focus:outline-none focus:border-[#FFB6C1] focus:ring-1 focus:ring-[#FFB6C1]" placeholder="John Doe" />
+                  </div>
+                  <div>
+                    <label className="block text-sm mb-1 opacity-80">Email Address</label>
+                    <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black border border-[#FFB6C1]/40 rounded-lg p-3 text-[#FFB6C1] focus:outline-none focus:border-[#FFB6C1] focus:ring-1 focus:ring-[#FFB6C1]" placeholder="john@example.com" />
+                  </div>
+                  <div>
+                    <label className="block text-sm mb-1 opacity-80">Phone Number</label>
+                    <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-black border border-[#FFB6C1]/40 rounded-lg p-3 text-[#FFB6C1] focus:outline-none focus:border-[#FFB6C1] focus:ring-1 focus:ring-[#FFB6C1]" placeholder="+1 (555) 000-0000" />
+                  </div>
+                  <button type="submit" className="w-full bg-[#FFB6C1] text-black font-bold text-lg rounded-lg p-3 mt-6 hover:bg-white transition-all">Enter Portal</button>
+                </form>
+              </div>
+            </div>
+          );
+        }
+
+        return (
+          <div className="min-h-screen bg-black text-[#FFB6C1] font-sans">
+            <nav className="border-b border-[#FFB6C1]/20 p-4 sticky top-0 bg-black/90 backdrop-blur z-10">
+              <div className="max-w-6xl mx-auto flex items-center justify-between">
+                <div className="flex items-center space-x-3 cursor-pointer" onClick={() => { setResults(null); setNewsInput(''); }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14c-4.418 0-8 1.343-8 3v2h16v-2c0-1.657-3.582-3-8-3z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeLinejoin="round" strokeWidth={2} d="M12 14V6a4 4 0 00-8 0v2" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 8v-2a4 4 0 00-8 0" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h16" />
+                  </svg>
+                  <span className="text-xl font-bold tracking-widest">SHERLOCK AGENT</span>
+                </div>
+                <div className="text-sm opacity-80">
+                  Welcome, {name.split(' ')[0]}
+                  <button onClick={() => setIsLoggedIn(false)} className="ml-4 text-xs border border-[#FFB6C1] px-2 py-1 rounded hover:bg-[#FFB6C1] hover:text-black transition-colors">Log Out</button>
+                </div>
+              </div>
+            </nav>
+
+            <main className="max-w-4xl mx-auto p-4 py-8">
+              <section className="mb-12 bg-gray-900/50 p-6 rounded-xl border border-[#FFB6C1]/10">
+                <h2 className="text-2xl font-bold mb-4">How it works</h2>
+                <p className="leading-relaxed opacity-90 text-lg">Paste a claim or article below. The backend searches the web and returns a structured credibility report with supporting sources.</p>
+              </section>
+
+              <section className="mb-12">
+                <h2 className="text-3xl font-bold mb-6 text-center text-[#FFB6C1]">News Credibility Validator</h2>
+                <div className="bg-gray-900 rounded-xl p-6 border border-[#FFB6C1]/30">
+                  <textarea className="w-full bg-black border border-[#FFB6C1]/40 rounded-lg p-4 text-[#FFB6C1] focus:outline-none focus:border-[#FFB6C1] focus:ring-2 focus:ring-[#FFB6C1]/50 min-h-[150px] resize-y" placeholder="Paste the news text or claim you want to investigate here..." value={newsInput} onChange={(e) => setNewsInput(e.target.value)} />
+
+                  <div className="flex flex-col sm:flex-row items-center justify-between mt-4 gap-4">
+                    <button onClick={handleVerifyCredibility} disabled={isChecking || !newsInput.trim()} className="w-full sm:w-auto bg-[#FFB6C1] text-black font-bold text-lg rounded-lg px-8 py-3 hover:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                      {isChecking ? 'Investigating...' : 'Verify Credibility'}
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              {results && (
+                <div className="animate-fade-in-up">
+                  <h3 className="text-2xl font-bold mb-6 border-b border-[#FFB6C1]/20 pb-2">Investigation Findings</h3>
+                  <div className={`bg-[#0f1117] p-6 rounded-[32px] mb-8 border ${getVerdictColors(results.verdict).container}`}>
+                    <div className="bg-[#11151f] rounded-[28px] p-6 border border-[#ffb6c1]/20 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+                      <div className="flex items-start justify-between gap-4 mb-6">
+                        <div>
+                          <h4 className="text-xl font-bold text-[#FFB6C1]">Credibility Report</h4>
+                          <p className="text-sm opacity-70 mt-1">Information is sourced from trusted DDGS search results.</p>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getVerdictColors(results.verdict).badge}`}>
+                          {results.verdict}
+                        </span>
+                      </div>
+
+                      <div className="space-y-5 text-sm leading-relaxed opacity-90">
+                        <div>
+                          <h5 className="font-semibold text-[#ED7BAB]">Given Query</h5>
+                          <p className="mt-2">{results.given_query || results.topic}</p>
+                        </div>
+
+                        <div>
+                          <h5 className="font-semibold text-[#ED7BAB]">Confidence Score</h5>
+                          <p className="mt-2">{results.confidence_score || results.confidence}</p>
+                        </div>
+
+                        <div>
+                          <h5 className="font-semibold text-[#ED7BAB]">Key Findings</h5>
+                          <ul className="list-disc ml-6 mt-2 space-y-2">
+                            {(results.key_findings || []).map((finding, index) => (
+                              <li key={index}>{finding}</li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div>
+                          <h5 className="font-semibold text-[#ED7BAB]">Final Conclusion</h5>
+                          <p className="mt-2">{results.final_conclusion || results.summary}</p>
+                        </div>
+
+                        <div>
+                          <h5 className="font-semibold text-[#ED7BAB]">References</h5>
+                          <ul className="list-disc ml-6 mt-2 space-y-2">
+                            {(results.references || []).map((reference, index) => (
+                              <li key={index}>{reference}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </main>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+  </body>
+</html>
